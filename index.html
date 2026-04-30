@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>JAYENWARE — Product Verification</title>
+  <meta name="description" content="Verify authenticity of JAYENWARE products via barcode or serial number">
+  <meta name="theme-color" content="#1a1a1a">
+  <meta property="og:title" content="JAYENWARE Verification">
+  <meta property="og:description" content="Scan or enter code to verify your JAYENWARE product">
+  <link rel="icon" type="image/png" href="https://ozuwazkqyrxiwwfjceth.supabase.co/storage/v1/object/public/images/Beige%20Black%20Minimal%20Simple%20Modern%20Handwritten%20Graffiti%20Typographic%20Arts%20and_20251212_154142_0000.png">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Playfair Display', 'serif']
+          },
+          colors: {
+            primary: '#1a1a1a',
+            accent: '#c9a96e',
+            soft: '#f8f6f3'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary: #1a1a1a;
+      --accent: #c9a96e;
+      --soft: #f8f6f3;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+    
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background-color: #ffffff;
+      color: #1a1a1a;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 20% 50%, rgba(201, 169, 110, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(26, 26, 26, 0.02) 0%, transparent 50%),
+        radial-gradient(circle at 50% 80%, rgba(201, 169, 110, 0.03) 0%, transparent 50%);
+      background-attachment: fixed;
+    }
+    
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 
+        0 20px 60px rgba(0, 0, 0, 0.06),
+        0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    
+    .verification-badge {
+      animation: pulse-verification 2.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse-verification {
+      0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { transform: scale(1.08); opacity: 0.95; box-shadow: 0 0 0 12px rgba(34, 197, 94, 0); }
+    }
+    
+    .barcode-scanner {
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      aspect-ratio: 4/3;
+      background: #000;
+    }
+
+    #reader video {
+      object-fit: cover !important;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    #reader {
+      width: 100%;
+      height: 100%;
+      border: none !important;
+    }
+    
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 5%;
+      right: 5%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent), transparent);
+      animation: scan-move 2.2s linear infinite;
+      z-index: 10;
+      box-shadow: 0 0 20px rgba(201, 169, 110, 0.6), 0 0 60px rgba(201, 169, 110, 0.3);
+      border-radius: 2px;
+    }
+    
+    @keyframes scan-move {
+      0% { top: 0%; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+    
+    .scan-frame {
+      position: absolute;
+      inset: 8%;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 20px;
+      z-index: 5;
+      box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.1), 0 0 0 9999px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    }
+    
+    .scan-corner {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-color: var(--accent);
+      border-style: solid;
+      z-index: 6;
+    }
+    
+    .scan-corner.top-left { top: 6%; left: 6%; border-width: 3px 0 0 3px; border-radius: 8px 0 0 0; }
+    .scan-corner.top-right { top: 6%; right: 6%; border-width: 3px 3px 0 0; border-radius: 0 8px 0 0; }
+    .scan-corner.bottom-left { bottom: 6%; left: 6%; border-width: 0 0 3px 3px; border-radius: 0 0 0 8px; }
+    .scan-corner.bottom-right { bottom: 6%; right: 6%; border-width: 0 3px 3px 0; border-radius: 0 0 8px 0; }
+    
+    #toast { will-change: transform; }
+    
+    .verified-stamp { position: relative; }
+    .verified-stamp::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border: 3px solid var(--success);
+      border-radius: inherit;
+      opacity: 0.25;
+      animation: stamp-pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes stamp-pulse {
+      0%, 100% { inset: -6px; opacity: 0.25; }
+      50% { inset: -3px; opacity: 0.15; }
+    }
+    
+    .input-focus-ring { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .input-focus-ring:focus { box-shadow: 0 0 0 3px rgba(201, 169, 110, 0.2); border-color: var(--accent); }
+    
+    .btn-hover-effect { position: relative; overflow: hidden; }
+    .btn-hover-effect::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+      transform: translateX(-100%);
+      transition: transform 0.6s;
+    }
+    .btn-hover-effect:hover::after { transform: translateX(100%); }
+    
+    .product-thumbnail { transition: all 0.4s cubic-bezier(0.25, 0.1, 0.25, 1); }
+    .product-thumbnail:hover { transform: scale(1.03); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12); }
+    
+    .divider-dot { position: relative; }
+    .divider-dot::before, .divider-dot::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      transform: translateY(-50%);
+    }
+    .divider-dot::before { left: -12px; }
+    .divider-dot::after { right: -12px; }
+    
+    .fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.25, 0.1, 0.25, 1) forwards; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    
+    .glow-dot { animation: glow-dot 2s ease-in-out infinite; }
+    @keyframes glow-dot {
+      0%, 100% { box-shadow: 0 0 5px rgba(201, 169, 110, 0.5); }
+      50% { box-shadow: 0 0 20px rgba(201, 169, 110, 0.8), 0 0 40px rgba(201, 169, 110, 0.3); }
+    }
+
+    /* =========================================
+       CINEMATIC WELCOME INTRO (SEXY ANIMATIONS)
+       ========================================= */
+    #cinematic-intro {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s ease-in-out;
+      overflow: hidden;
+    }
+
+    #cinematic-intro.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .intro-particles {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(201, 169, 110, 0.15) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: intro-particle-drift 20s linear infinite;
+      opacity: 0.4;
+      z-index: 1;
+    }
+
+    @keyframes intro-particle-drift {
+      0% { transform: translateY(0) scale(1); }
+      100% { transform: translateY(-100px) scale(1.1); }
+    }
+
+    .intro-stage {
+      position: absolute;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      z-index: 2;
+      padding: 20px;
+      text-align: center;
+    }
+
+    /* Sexy blur and scale keyframes for a premium video feel */
+    @keyframes cinematic-reveal {
+      0% { opacity: 0; transform: scale(0.85) translateY(30px); filter: blur(15px); }
+      15% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0px); }
+      85% { opacity: 1; transform: scale(1.08) translateY(-10px); filter: blur(0px); }
+      100% { opacity: 0; transform: scale(1.15) translateY(-30px); filter: blur(15px); }
+    }
+
+    .play-stage-1 { animation: cinematic-reveal 6s cubic-bezier(0.25, 1, 0.5, 1) forwards; animation-delay: 0.5s; }
+    .play-stage-2 { animation: cinematic-reveal 6s cubic-bezier(0.25, 1, 0.5, 1) forwards; animation-delay: 6s; }
+    .play-stage-3 { animation: cinematic-reveal 7s cubic-bezier(0.25, 1, 0.5, 1) forwards; animation-delay: 12s; }
+
+    .gold-glow {
+      text-shadow: 0 0 20px rgba(201, 169, 110, 0.6), 0 0 40px rgba(201, 169, 110, 0.3);
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <div id="cinematic-intro">
+    <div class="intro-particles"></div>
+    
+    <div id="stage-1" class="intro-stage">
+      <img src="https://ozuwazkqyrxiwwfjceth.supabase.co/storage/v1/object/public/images/Beige%20Black%20Minimal%20Simple%20Modern%20Handwritten%20Graffiti%20Typographic%20Arts%20and_20251212_154142_0000.png" 
+           class="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl shadow-2xl mb-6 shadow-[0_0_40px_rgba(201,169,110,0.3)]">
+      <h2 class="text-4xl sm:text-6xl font-black font-serif text-white tracking-widest uppercase gold-glow">
+        JAYEN<span class="text-accent">WARE</span>
+      </h2>
+      <p class="text-[10px] sm:text-xs tracking-[0.4em] text-gray-400 mt-4 uppercase">Excellence Verified</p>
+    </div>
+
+    <div id="stage-2" class="intro-stage">
+      <div class="w-20 h-20 bg-accent rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(201,169,110,0.5)]">
+        <i class="fa-solid fa-check text-4xl text-primary"></i>
+      </div>
+      <h2 class="text-3xl sm:text-5xl font-serif text-white tracking-wider uppercase">Authenticity</h2>
+      <h2 class="text-3xl sm:text-5xl font-serif text-accent tracking-wider uppercase mt-2 gold-glow">Confirmed</h2>
+      <p class="text-gray-400 mt-6 tracking-widest text-[10px] sm:text-xs uppercase border-t border-gray-700 pt-4 w-48">100% Original</p>
+    </div>
+
+    <div id="stage-3" class="intro-stage">
+      <h2 class="text-2xl sm:text-4xl font-serif text-white tracking-widest uppercase leading-snug">
+        Welcome, <br><span id="intro-customer-name" class="text-accent gold-glow text-3xl sm:text-5xl"></span>
+      </h2>
+      <p class="mt-8 text-gray-500 font-mono text-xs sm:text-sm tracking-[0.2em] uppercase">Product Code</p>
+      <p id="intro-barcode" class="mt-2 text-white font-mono text-lg sm:text-xl tracking-[0.3em] uppercase bg-white/10 px-6 py-2 rounded-xl backdrop-blur-md border border-white/20"></p>
+    </div>
+
+    <button onclick="finishIntro()" class="absolute bottom-10 z-50 text-gray-500 text-[10px] tracking-widest uppercase hover:text-accent transition-colors border-b border-gray-700 hover:border-accent pb-1">
+      Skip Intro <i class="fa-solid fa-angles-right ml-1"></i>
+    </button>
+  </div>
+
+  <div id="toast" style="position:fixed;top:20px;right:20px;z-index:200;transform:translateX(120%);transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);max-width:calc(100vw - 40px);">
+    <div class="bg-white shadow-2xl rounded-2xl p-4 flex items-center gap-3 min-w-[280px] border border-gray-100" style="box-shadow: 0 20px 60px rgba(0,0,0,0.15);">
+      <span id="toast-icon" class="w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0"></span>
+      <p id="toast-text" class="text-xs font-bold flex-grow pr-2"></p>
+      <button onclick="hideToast()" class="text-gray-300 hover:text-gray-600 shrink-0 transition-colors p-1"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </div>
+
+  <nav class="glass-card fixed w-full top-0 z-50">
+    <div class="max-w-5xl mx-auto px-4 h-16 flex justify-between items-center">
+      <a href="/" class="flex items-center gap-2.5 shrink-0 no-underline group">
+        <div class="relative">
+          <img src="https://ozuwazkqyrxiwwfjceth.supabase.co/storage/v1/object/public/images/Beige%20Black%20Minimal%20Simple%20Modern%20Handwritten%20Graffiti%20Typographic%20Arts%20and_20251212_154142_0000.png" 
+               class="w-9 h-9 rounded-xl shadow-md group-hover:shadow-lg transition-all duration-300" alt="JAYENWARE Logo">
+          <div class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></div>
+        </div>
+        <span class="text-lg font-black tracking-tight font-serif text-primary">JAYEN<span class="text-accent">WARE</span> <span class="text-[10px] font-sans tracking-[0.15em] text-gray-400 ml-0.5">VERIFY</span></span>
+      </a>
+      <div class="flex items-center gap-3 sm:gap-4">
+        <a href="https://www.jayenware.shop" target="_blank" 
+           class="hidden sm:flex text-xs font-bold text-gray-500 hover:text-primary transition no-underline items-center gap-1.5 bg-gray-50 hover:bg-gray-100 px-3.5 py-2 rounded-xl">
+          <i class="fa-solid fa-store text-accent"></i> Visit Shop
+        </a>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-3.5 py-2 rounded-xl border border-accent/20 flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 bg-accent rounded-full glow-dot"></span> Official
+        </span>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-grow pt-20 sm:pt-24 flex flex-col items-center justify-center p-4 sm:p-6">
+    
+    <div class="text-center mb-8 sm:mb-12 max-w-2xl">
+      <div class="inline-flex items-center gap-2 bg-green-50 text-green-700 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider mb-5 border border-green-100 shadow-sm">
+        <span class="w-2.5 h-2.5 bg-green-500 rounded-full verification-badge"></span>
+        Authenticity Verification
+      </div>
+      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black font-serif mb-4 leading-tight">
+        Verify Your <span class="text-accent">Product</span>
+      </h1>
+      <p class="text-gray-500 text-sm sm:text-base leading-relaxed max-w-lg mx-auto">
+        Enter the barcode number or scan the QR/Barcode on your JAYENWARE product tag to confirm its authenticity.
+      </p>
+    </div>
+
+    <div class="w-full max-w-lg bg-white rounded-[32px] shadow-2xl p-6 sm:p-8 border border-gray-50 fade-in-up" style="box-shadow: 0 30px 80px rgba(0,0,0,0.08);">
+      
+      <div class="mb-5">
+        <label class="text-[10px] font-bold uppercase tracking-[0.15em] text-gray-400 mb-2.5 flex items-center gap-2">
+          <i class="fa-solid fa-keyboard text-accent"></i> Barcode / Serial Number
+        </label>
+        <div class="flex gap-2.5">
+          <div class="relative flex-grow">
+            <i class="fa-solid fa-barcode absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 text-sm"></i>
+            <input type="text" id="barcode-input" placeholder="e.g., JW-20260001-A3F7" 
+                   class="w-full pl-10 pr-4 py-3.5 rounded-2xl bg-gray-50 border border-gray-100 outline-none text-sm font-mono uppercase input-focus-ring"
+                   autocomplete="off" maxlength="30">
+          </div>
+          <button onclick="verifyBarcode()" 
+                  class="px-6 bg-primary text-white rounded-2xl font-bold text-sm hover:bg-accent transition-all duration-300 shrink-0 btn-hover-effect shadow-lg shadow-primary/10 hover:shadow-accent/20">
+            <i class="fa-solid fa-magnifying-glass mr-1.5"></i> Verify
+          </button>
+        </div>
+      </div>
+
+      <div class="relative text-center mb-5">
+        <div class="absolute inset-x-0 top-1/2 h-px bg-gray-100"></div>
+        <span class="relative bg-white px-5 text-[10px] font-bold text-gray-300 uppercase tracking-wider divider-dot">or scan code</span>
+      </div>
+
+      <div class="mb-4">
+        <button onclick="startScanner()" id="scan-btn" 
+                class="w-full py-5 border-2 border-dashed border-gray-200 rounded-2xl hover:border-accent/50 transition-all duration-300 group bg-gradient-to-b from-white to-gray-50/50">
+          <div class="flex flex-col items-center gap-2.5">
+            <div class="w-16 h-16 bg-soft rounded-2xl flex items-center justify-center group-hover:bg-accent/10 transition-all duration-300 group-hover:scale-105 shadow-sm">
+              <i class="fa-solid fa-qrcode text-2xl text-primary group-hover:text-accent transition-colors"></i>
+            </div>
+            <span class="text-xs font-bold text-gray-500 group-hover:text-primary transition-colors">Tap to Scan QR / Barcode</span>
+            <span class="text-[10px] text-gray-400 flex items-center gap-1">
+              <i class="fa-solid fa-camera text-[10px]"></i> Uses your device camera
+            </span>
+          </div>
+        </button>
+      </div>
+
+      <div id="camera-container" class="hidden mb-4 barcode-scanner">
+        <div id="reader" class="w-full h-full"></div>
+        
+        <div class="scan-line"></div>
+        <div class="scan-frame"></div>
+        <div class="scan-corner top-left"></div>
+        <div class="scan-corner top-right"></div>
+        <div class="scan-corner bottom-left"></div>
+        <div class="scan-corner bottom-right"></div>
+        <button onclick="stopScanner()" 
+                class="absolute top-4 right-4 z-20 bg-black/60 hover:bg-black/80 text-white w-9 h-9 rounded-full flex items-center justify-center text-sm backdrop-blur-sm transition-all">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <p class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 text-white/80 text-[10px] font-bold bg-black/60 backdrop-blur-sm px-4 py-1.5 rounded-full whitespace-nowrap">
+          Position barcode in frame
+        </p>
+      </div>
+
+      <div id="verification-result" class="hidden mt-6 pt-6 border-t border-gray-100">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4 sm:gap-8 mt-8 sm:mt-12 max-w-lg w-full">
+      <div class="text-center p-4 bg-white rounded-2xl shadow-sm border border-gray-50 hover:shadow-md transition-shadow">
+        <div class="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center mx-auto mb-2.5">
+          <i class="fa-solid fa-shield-halved text-accent text-lg"></i>
+        </div>
+        <p class="text-[9px] font-bold uppercase tracking-wider text-primary">100% Authentic</p>
+      </div>
+      <div class="text-center p-4 bg-white rounded-2xl shadow-sm border border-gray-50 hover:shadow-md transition-shadow">
+        <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-2.5">
+          <i class="fa-solid fa-database text-accent text-lg"></i>
+        </div>
+        <p class="text-[9px] font-bold uppercase tracking-wider text-primary">Real-Time DB</p>
+      </div>
+      <div class="text-center p-4 bg-white rounded-2xl shadow-sm border border-gray-50 hover:shadow-md transition-shadow">
+        <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center mx-auto mb-2.5">
+          <i class="fa-solid fa-tag text-accent text-lg"></i>
+        </div>
+        <p class="text-[9px] font-bold uppercase tracking-wider text-primary">Unique Barcode</p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-primary text-gray-400 py-8 mt-auto">
+    <div class="max-w-5xl mx-auto px-4 text-center">
+      <p class="text-[10px] uppercase tracking-wider">
+        Powered by <a href="https://binzeo.vercel.app" target="_blank" rel="noopener" class="text-accent font-bold hover:text-white transition no-underline">BINZEO</a>
+      </p>
+      <p class="text-[9px] mt-2 text-gray-500">&copy; <span id="display-year"></span> JAYENWARE Verification. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    // =============================================
+    // SUPABASE CONFIGURATION
+    // =============================================
+    const SUPABASE_URL = "https://ozuwazkqyrxiwwfjceth.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96dXdhemtxeXJ4aXd3ZmpjZXRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2MDc0MTAsImV4cCI6MjA4ODE4MzQxMH0.1Mn5bjENOsK88E2tDpY6xHg4quDnVXlU6eGtGBdK7Xw";
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // =============================================
+    // GLOBAL STATE
+    // =============================================
+    let html5QrCode = null;
+    let scanningActive = false;
+    let currentSuccessData = null;
+    let cinematicTimeout = null;
+
+    // =============================================
+    // TOAST SYSTEM
+    // =============================================
+    function showToast(text, type = 'success') {
+      const toast = document.getElementById('toast');
+      const icon = document.getElementById('toast-icon');
+      document.getElementById('toast-text').innerText = text;
+      
+      if (type === 'success') {
+        icon.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-sm bg-green-100 text-green-600 shrink-0';
+        icon.innerHTML = '<i class="fa-solid fa-check"></i>';
+      } else if (type === 'error') {
+        icon.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-sm bg-red-100 text-red-600 shrink-0';
+        icon.innerHTML = '<i class="fa-solid fa-exclamation"></i>';
+      } else {
+        icon.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-sm bg-blue-100 text-blue-600 shrink-0';
+        icon.innerHTML = '<i class="fa-solid fa-info"></i>';
+      }
+      
+      toast.style.transform = 'translateX(0)';
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => {
+        toast.style.transform = 'translateX(120%)';
+      }, 4000);
+    }
+
+    function hideToast() {
+      document.getElementById('toast').style.transform = 'translateX(120%)';
+    }
+
+    // =============================================
+    // COPY PUBLIC LINK
+    // =============================================
+    window.copyPublicLink = function(link) {
+      navigator.clipboard.writeText(link).then(() => {
+        showToast('Public link copied to clipboard!', 'success');
+      }).catch(err => {
+        showToast('Failed to copy link', 'error');
+      });
+    }
+
+    // =============================================
+    // CINEMATIC INTRO SYSTEM (SEXY ANIMATIONS)
+    // =============================================
+    function playCinematicIntro(data) {
+      currentSuccessData = data;
+      const introOverlay = document.getElementById('cinematic-intro');
+      
+      // Update UI with data
+      document.getElementById('intro-barcode').innerText = data.barcode_number;
+      // Added User Name
+      document.getElementById('intro-customer-name').innerText = data.customer_name ? data.customer_name : 'Exclusive Member';
+      
+      // Reset animation stages
+      const stage1 = document.getElementById('stage-1');
+      const stage2 = document.getElementById('stage-2');
+      const stage3 = document.getElementById('stage-3');
+      
+      // Re-trigger CSS animations by re-assigning class names
+      stage1.className = 'intro-stage play-stage-1';
+      stage2.className = 'intro-stage play-stage-2';
+      stage3.className = 'intro-stage play-stage-3';
+
+      // Lock scrolling
+      document.body.style.overflow = 'hidden';
+      
+      // Show Intro
+      introOverlay.classList.add('active');
+      
+      // End sequence automatically after 19 seconds
+      cinematicTimeout = setTimeout(() => {
+        finishIntro();
+      }, 19000);
+    }
+
+    function finishIntro() {
+      clearTimeout(cinematicTimeout);
+      const introOverlay = document.getElementById('cinematic-intro');
+      introOverlay.classList.remove('active');
+      document.body.style.overflow = ''; // Unlock scrolling
+      
+      // Render Valid Result directly on screen after cinematic intro
+      if (currentSuccessData) {
+        renderValidResult(currentSuccessData);
+        document.getElementById('barcode-input').value = '';
+      }
+    }
+
+    // =============================================
+    // BARCODE VERIFICATION LOGIC
+    // =============================================
+    async function verifyBarcode(barcodeValue = null) {
+      const input = document.getElementById('barcode-input');
+      const barcode = barcodeValue || input.value.trim().toUpperCase();
+      
+      if (!barcode) {
+        showToast('Please enter a barcode number', 'error');
+        input.classList.add('animate-pulse');
+        setTimeout(() => input.classList.remove('animate-pulse'), 500);
+        return;
+      }
+
+      const resultDiv = document.getElementById('verification-result');
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML = `
+        <div class="text-center py-8 fade-in-up">
+          <div class="w-14 h-14 border-2 border-primary border-t-transparent rounded-2xl animate-spin mx-auto mb-4"></div>
+          <p class="text-xs font-bold text-gray-400">Verifying authentic database...</p>
+          <p class="text-[10px] text-gray-300 mt-1 font-mono">${escapeHTML(barcode)}</p>
+        </div>
+      `;
+
+      try {
+        const { data, error } = await _supabase
+          .from('verification_entries')
+          .select(`
+            *,
+            order:order_id ( id, status, created_at, member_info ),
+            product:product_id ( id, title, category, price, img, description )
+          `)
+          .eq('barcode_number', barcode)
+          .single();
+
+        if (error || !data) {
+          renderInvalidResult(barcode);
+          return;
+        }
+
+        if (!data.first_verified_at) {
+          await _supabase.from('verification_entries')
+            .update({ first_verified_at: new Date().toISOString(), verification_count: (data.verification_count || 0) + 1 })
+            .eq('id', data.id);
+        } else {
+          await _supabase.from('verification_entries')
+            .update({ verification_count: (data.verification_count || 0) + 1 })
+            .eq('id', data.id);
+        }
+
+        // Trigger the ~20 sec cinematic intro instead of rendering instantly
+        playCinematicIntro(data);
+        
+      } catch (err) {
+        console.error('Verification error:', err);
+        renderErrorResult();
+      }
+    }
+
+    function renderValidResult(data) {
+      const resultDiv = document.getElementById('verification-result');
+      const product = data.product || {};
+      const isFirstVerification = !data.first_verified_at;
+      
+      // Variables mapping exact SQL fields
+      const pTitle = data.product_title || (product.title || 'N/A');
+      const publicLink = `https://verify.jayenware.shop/${data.barcode_number}`;
+      
+      resultDiv.innerHTML = `
+        <div class="verified-stamp bg-green-50 border border-green-200 rounded-2xl p-6 text-center fade-in-up">
+          <div class="w-20 h-20 bg-gradient-to-br from-green-400 to-green-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 verification-badge shadow-lg shadow-green-500/30">
+            <i class="fa-solid fa-check text-3xl"></i>
+          </div>
+          <h3 class="text-xl font-black text-green-700 uppercase mb-1">Authentic Product</h3>
+          <p class="text-xs text-green-600 font-bold">Verified by JAYENWARE</p>
+          ${isFirstVerification ? `
+            <span class="inline-flex items-center gap-1 mt-3 bg-green-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm">
+              <i class="fa-solid fa-star text-[8px]"></i> First Time Verified
+            </span>` : `
+            <span class="inline-block mt-3 bg-green-100 text-green-700 text-[10px] font-bold px-3 py-1.5 rounded-full">
+              Verified ${data.verification_count + 1} times
+            </span>`
+          }
+        </div>
+        
+        ${product.img ? `
+        <div class="mt-5 flex justify-center fade-in-up">
+          <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden shadow-md border-2 border-white product-thumbnail">
+            <img src="${product.img}" alt="${escapeHTML(pTitle)}" class="w-full h-full object-cover">
+          </div>
+        </div>
+        ` : ''}
+        
+        <div class="mt-5 space-y-0 bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm fade-in-up">
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-barcode text-accent"></i> Barcode</span>
+            <span class="font-mono font-bold text-[11px] text-primary">${escapeHTML(data.barcode_number)}</span>
+          </div>
+          
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-user text-accent"></i> Customer</span>
+            <span class="font-bold text-[11px] text-primary text-right">${escapeHTML(data.customer_name || 'N/A')}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-envelope text-accent"></i> Email</span>
+            <span class="font-bold text-[11px] text-primary text-right">${escapeHTML(data.customer_email || 'N/A')}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-phone text-accent"></i> Phone</span>
+            <span class="font-bold text-[11px] text-primary text-right">${escapeHTML(data.customer_phone || 'N/A')}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-map-location-dot text-accent"></i> Shipping</span>
+            <span class="font-bold text-[11px] text-primary text-right max-w-[50%] truncate">${escapeHTML(data.shipping_address || 'N/A')}</span>
+          </div>
+          
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-box text-accent"></i> Product</span>
+            <span class="font-bold text-[11px] text-primary text-right max-w-[60%]">${escapeHTML(pTitle)}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-layer-group text-accent"></i> Variant</span>
+            <span class="font-bold text-[11px] text-primary text-right">${escapeHTML(data.variant_name || 'N/A')}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-cubes text-accent"></i> Quantity</span>
+            <span class="font-bold text-[11px] text-primary text-right">${escapeHTML(String(data.quantity || 1))}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-tags text-accent"></i> Price</span>
+            <span class="font-bold text-[11px] text-primary text-right">${data.price ? escapeHTML(String(data.price)) : 'N/A'}</span>
+          </div>
+          
+          <div class="flex justify-between items-center py-3.5 px-4 border-b border-gray-50">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-receipt text-accent"></i> Order ID</span>
+            <span class="font-bold text-[11px] text-primary">#${data.order_id || 'N/A'}</span>
+          </div>
+
+          <div class="flex justify-between items-center py-3.5 px-4">
+            <span class="text-gray-400 font-bold text-[11px] flex items-center gap-2"><i class="fa-solid fa-truck text-accent"></i> Status</span>
+            <span class="font-bold text-[11px] text-primary capitalize">${escapeHTML(data.order_status || 'N/A')}</span>
+          </div>
+        </div>
+        
+        <div class="mt-5 p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center fade-in-up">
+          <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Public Verification Link</p>
+          <div class="flex items-center gap-2 bg-white p-2 rounded-xl border border-gray-200">
+            <input type="text" readonly value="${publicLink}" class="w-full bg-transparent text-[11px] text-gray-500 outline-none px-2 font-mono truncate" onclick="this.select()">
+            <button onclick="copyPublicLink('${publicLink}')" class="bg-primary text-white w-9 h-9 rounded-lg flex items-center justify-center hover:bg-accent transition-colors shrink-0">
+              <i class="fa-solid fa-copy text-sm"></i>
+            </button>
+          </div>
+        </div>
+
+        <button onclick="document.getElementById('verification-result').classList.add('hidden'); document.getElementById('barcode-input').focus();" 
+                class="mt-5 w-full py-3.5 bg-white border-2 border-gray-100 text-primary rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-gray-50 transition-all duration-300">
+          <i class="fa-solid fa-rotate-right mr-1.5"></i> Verify Another
+        </button>
+      `;
+      // Scroll into view
+      setTimeout(() => resultDiv.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    }
+
+    function renderInvalidResult(barcode) {
+      const resultDiv = document.getElementById('verification-result');
+      resultDiv.innerHTML = `
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-6 text-center fade-in-up">
+          <div class="w-20 h-20 bg-gradient-to-br from-red-400 to-red-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/30">
+            <i class="fa-solid fa-exclamation-triangle text-3xl"></i>
+          </div>
+          <h3 class="text-xl font-black text-red-700 uppercase mb-1">Not Verified</h3>
+          <p class="text-xs text-red-600 font-bold">This barcode is not recognized</p>
+        </div>
+        
+        <div class="mt-5 p-5 bg-soft rounded-2xl border border-gray-200 text-center">
+          <p class="text-xs text-gray-500 mb-4">
+            Barcode <span class="font-mono font-bold text-primary bg-white px-3 py-1 rounded-lg shadow-sm">${escapeHTML(barcode)}</span> 
+            was not found in our database.
+          </p>
+        </div>
+        
+        <div class="flex gap-2.5 mt-4">
+          <button onclick="document.getElementById('verification-result').classList.add('hidden'); document.getElementById('barcode-input').value=''; document.getElementById('barcode-input').focus();" 
+                  class="flex-1 py-3.5 bg-primary text-white rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-accent transition-all duration-300 shadow-lg shadow-primary/10">
+            <i class="fa-solid fa-rotate-right mr-1.5"></i> Try Again
+          </button>
+        </div>
+      `;
+    }
+
+    function renderErrorResult() {
+      const resultDiv = document.getElementById('verification-result');
+      resultDiv.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center fade-in-up">
+          <div class="w-20 h-20 bg-gradient-to-br from-yellow-400 to-yellow-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-yellow-500/30">
+            <i class="fa-solid fa-wifi-exclamation text-3xl"></i>
+          </div>
+          <h3 class="text-xl font-black text-yellow-700 uppercase mb-1">Connection Error</h3>
+          <p class="text-xs text-yellow-600 font-bold">Unable to verify at this moment</p>
+        </div>
+        <button onclick="document.getElementById('verification-result').classList.add('hidden')" 
+                class="mt-4 w-full py-3.5 bg-primary text-white rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-accent transition-all duration-300 shadow-lg shadow-primary/10">
+          <i class="fa-solid fa-rotate-right mr-1.5"></i> Try Again
+        </button>
+      `;
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+
+    // =============================================
+    // HTML5-QRCODE SCANNER LOGIC
+    // =============================================
+    async function startScanner() {
+      const cameraContainer = document.getElementById('camera-container');
+      const scanBtn = document.getElementById('scan-btn');
+      
+      if (scanningActive) {
+        stopScanner();
+        return;
+      }
+
+      cameraContainer.classList.remove('hidden');
+      cameraContainer.classList.add('fade-in-up');
+      scanBtn.classList.add('hidden');
+      scanningActive = true;
+
+      try {
+        html5QrCode = new Html5Qrcode("reader");
+
+        const config = {
+          fps: 10,
+          aspectRatio: 1.333334,
+          disableFlip: false,
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        };
+
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText, decodedResult) => {
+            stopScanner();
+            document.getElementById('barcode-input').value = decodedText;
+            verifyBarcode(decodedText);
+            
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            showToast('Barcode detected!', 'success');
+          },
+          (errorMessage) => { /* Ignore read errors */ }
+        );
+
+      } catch (err) {
+        console.error('Camera error:', err);
+        showToast('Camera access denied or device not supported.', 'error');
+        stopScanner();
+      }
+    }
+
+    function stopScanner() {
+      const resetUI = () => {
+        scanningActive = false;
+        const cameraContainer = document.getElementById('camera-container');
+        cameraContainer.classList.add('hidden');
+        cameraContainer.classList.remove('fade-in-up');
+        document.getElementById('scan-btn').classList.remove('hidden');
+      };
+
+      if (html5QrCode && scanningActive) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          resetUI();
+        }).catch(err => {
+          console.error("Failed to stop scanner", err);
+          resetUI();
+        });
+      } else {
+        resetUI();
+      }
+    }
+
+    document.getElementById('barcode-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        verifyBarcode();
+      }
+    });
+
+    // =============================================
+    // URL PARAMETER & PATH ROUTING
+    // =============================================
+    function checkUrlForBarcode() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const codeParam = urlParams.get('code');
+      const pathname = window.location.pathname.replace(/^\/+/, '').replace(/\/+$/, '');
+      
+      let barcodeToVerify = '';
+      if (codeParam) {
+        barcodeToVerify = codeParam;
+      } else if (pathname && pathname !== 'index.html') {
+        barcodeToVerify = decodeURIComponent(pathname);
+      }
+
+      if (barcodeToVerify) {
+        document.getElementById('barcode-input').value = barcodeToVerify;
+        verifyBarcode(barcodeToVerify);
+      } else {
+        setTimeout(() => document.getElementById('barcode-input').focus(), 600);
+      }
+    }
+
+    window.onload = function() {
+      document.getElementById('display-year').innerText = new Date().getFullYear();
+      checkUrlForBarcode();
+    };
+
+    window.addEventListener('beforeunload', () => stopScanner());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && scanningActive) stopScanner();
+    });
+  </script>
+</body>
+</html>
